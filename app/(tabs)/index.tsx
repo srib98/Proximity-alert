@@ -196,7 +196,9 @@ export default function MapScreen() {
     try {
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
       });
 
       const { sound } = await Audio.Sound.createAsync(ALARM_ASSET, {
