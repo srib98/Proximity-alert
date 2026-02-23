@@ -54,6 +54,7 @@ export default function MapScreen() {
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const alarmActiveRef = useRef(false);
+  const vibrationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
 
   const pulseScale = useSharedValue(1);
@@ -130,9 +131,9 @@ export default function MapScreen() {
 
       locationSubRef.current = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 2000,
-          distanceInterval: 5,
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 3,
         },
         (loc) => {
           setUserLocation({
@@ -199,6 +200,8 @@ export default function MapScreen() {
         staysActiveInBackground: true,
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
+        interruptionModeIOS: 1,
+        interruptionModeAndroid: 1,
       });
 
       const { sound } = await Audio.Sound.createAsync(ALARM_ASSET, {
@@ -207,7 +210,13 @@ export default function MapScreen() {
         shouldPlay: true,
       });
       soundRef.current = sound;
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      vibrationTimerRef.current = setInterval(() => {
+        if (alarmActiveRef.current) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+      }, 1500);
     } catch (e) {
       console.error("Alarm error:", e);
     }
@@ -215,6 +224,10 @@ export default function MapScreen() {
 
   const stopAlarm = async () => {
     alarmActiveRef.current = false;
+    if (vibrationTimerRef.current) {
+      clearInterval(vibrationTimerRef.current);
+      vibrationTimerRef.current = null;
+    }
     if (soundRef.current) {
       try {
         await soundRef.current.stopAsync();
