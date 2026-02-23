@@ -23,6 +23,7 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { useAlerts, AlertZone } from "@/contexts/AlertContext";
 import { getDistanceMeters, formatDistance } from "@/lib/location";
+import { TN_TOLLGATES } from "@/data/tn-tollgates";
 
 function AlertZoneCard({
   zone,
@@ -176,11 +177,12 @@ function AlertZoneCard({
 
 export default function AlertsScreen() {
   const insets = useSafeAreaInsets();
-  const { zones, toggleZone, removeZone } = useAlerts();
+  const { zones, toggleZone, removeZone, addBulkZones } = useAlerts();
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [loadingTollgates, setLoadingTollgates] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -218,6 +220,38 @@ export default function AlertsScreen() {
 
   const activeCount = zones.filter((z) => z.enabled).length;
 
+  const tollgateCount = zones.filter((z) =>
+    TN_TOLLGATES.some((t) => t.name.toLowerCase() === z.name.toLowerCase())
+  ).length;
+  const allTollgatesLoaded = tollgateCount >= TN_TOLLGATES.length;
+
+  const loadTollgates = async () => {
+    setLoadingTollgates(true);
+    try {
+      const tollZones = TN_TOLLGATES.map((t) => ({
+        name: t.name,
+        latitude: t.latitude,
+        longitude: t.longitude,
+        radiusMeters: 2000,
+        enabled: true,
+      }));
+      const added = await addBulkZones(tollZones);
+      if (Platform.OS === "web") {
+        // no alert needed
+      } else {
+        if (added > 0) {
+          Alert.alert("Tollgates Loaded", `Added ${added} Tamil Nadu tollgate locations as alert zones (2 km radius).`);
+        } else {
+          Alert.alert("Already Loaded", "All Tamil Nadu tollgate locations are already in your alert zones.");
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load tollgates:", e);
+    } finally {
+      setLoadingTollgates(false);
+    }
+  };
+
   return (
     <View
       style={[
@@ -235,6 +269,35 @@ export default function AlertsScreen() {
           </Text>
         </View>
       </View>
+
+      <Pressable
+        style={[
+          styles.tollgateButton,
+          allTollgatesLoaded && styles.tollgateButtonLoaded,
+          loadingTollgates && { opacity: 0.6 },
+        ]}
+        onPress={loadTollgates}
+        disabled={loadingTollgates || allTollgatesLoaded}
+      >
+        <MaterialCommunityIcons
+          name="boom-gate"
+          size={20}
+          color={allTollgatesLoaded ? Colors.safe : "#FFC107"}
+        />
+        <Text style={styles.tollgateButtonText}>
+          {loadingTollgates
+            ? "Loading..."
+            : allTollgatesLoaded
+            ? `All ${TN_TOLLGATES.length} TN Tollgates Loaded`
+            : `Load TN Tollgates (${TN_TOLLGATES.length} locations)`}
+        </Text>
+        {!allTollgatesLoaded && !loadingTollgates && (
+          <Ionicons name="add-circle" size={20} color="#FFC107" />
+        )}
+        {allTollgatesLoaded && (
+          <Ionicons name="checkmark-circle" size={20} color={Colors.safe} />
+        )}
+      </Pressable>
 
       <FlatList
         data={zones}
@@ -374,6 +437,29 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  tollgateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(255, 193, 7, 0.1)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255, 193, 7, 0.3)",
+  },
+  tollgateButtonLoaded: {
+    backgroundColor: "rgba(52, 199, 89, 0.08)",
+    borderColor: "rgba(52, 199, 89, 0.25)",
+  },
+  tollgateButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
   },
   emptyContainer: {
     flex: 1,

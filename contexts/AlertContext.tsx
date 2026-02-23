@@ -15,6 +15,7 @@ export interface AlertZone {
 interface AlertContextValue {
   zones: AlertZone[];
   addZone: (zone: Omit<AlertZone, "id" | "createdAt">) => Promise<void>;
+  addBulkZones: (zoneList: Omit<AlertZone, "id" | "createdAt">[]) => Promise<number>;
   removeZone: (id: string) => Promise<void>;
   toggleZone: (id: string) => Promise<void>;
   updateZone: (id: string, updates: Partial<AlertZone>) => Promise<void>;
@@ -65,6 +66,27 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     await saveZones(updated);
   }, [zones]);
 
+  const addBulkZones = useCallback(async (zoneList: Omit<AlertZone, "id" | "createdAt">[]) => {
+    const existingNames = new Set(zones.map((z) => z.name.toLowerCase()));
+    const newZones: AlertZone[] = [];
+    for (const zone of zoneList) {
+      if (!existingNames.has(zone.name.toLowerCase())) {
+        newZones.push({
+          ...zone,
+          id: Crypto.randomUUID(),
+          createdAt: Date.now(),
+        });
+        existingNames.add(zone.name.toLowerCase());
+      }
+    }
+    if (newZones.length > 0) {
+      const updated = [...zones, ...newZones];
+      setZones(updated);
+      await saveZones(updated);
+    }
+    return newZones.length;
+  }, [zones]);
+
   const removeZone = useCallback(async (id: string) => {
     const updated = zones.filter((z) => z.id !== id);
     setZones(updated);
@@ -88,8 +110,8 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   }, [zones]);
 
   const value = useMemo(
-    () => ({ zones, addZone, removeZone, toggleZone, updateZone, isLoading }),
-    [zones, addZone, removeZone, toggleZone, updateZone, isLoading]
+    () => ({ zones, addZone, addBulkZones, removeZone, toggleZone, updateZone, isLoading }),
+    [zones, addZone, addBulkZones, removeZone, toggleZone, updateZone, isLoading]
   );
 
   return (
